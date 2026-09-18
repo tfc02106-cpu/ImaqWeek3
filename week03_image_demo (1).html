@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>第三週｜工業影像基礎互動實作</title>
+<style>
+:root{--blue:#145da0;--blue2:#eaf4ff;--ink:#17212b;--muted:#607080;--line:#d6e0e8;--ok:#087f5b;--warn:#b35c00;--bg:#f5f8fb}
+*{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font-family:"Noto Sans TC","Microsoft JhengHei",sans-serif;line-height:1.6}
+header{background:linear-gradient(120deg,#0d477c,#1779ba);color:white;padding:28px max(22px,calc((100% - 1180px)/2)) 24px}
+header h1{margin:0;font-size:clamp(25px,3vw,38px)} header p{margin:7px 0 0;opacity:.92}
+main{max-width:1180px;margin:22px auto 60px;padding:0 18px}.panel{background:white;border:1px solid var(--line);border-radius:14px;padding:22px;margin-bottom:18px;box-shadow:0 4px 18px rgba(27,56,82,.06)}
+h2{margin:0 0 14px;color:#0d477c;font-size:23px} h3{margin:18px 0 8px;font-size:18px}.lead{color:var(--muted);margin-top:-7px}
+.upload{display:flex;gap:14px;align-items:center;flex-wrap:wrap;padding:17px;background:var(--blue2);border:2px dashed #7aadd3;border-radius:12px}
+input[type=file]{max-width:100%} button,.download{border:0;border-radius:9px;background:var(--blue);color:white;padding:10px 15px;font-size:15px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-block}button:hover,.download:hover{filter:brightness(.92)}button.secondary{background:#526777}button:disabled{opacity:.45;cursor:not-allowed}
+.meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:10px;margin-top:14px}.metric{border-left:4px solid #58a5d8;background:#f7fbfe;padding:9px 12px}.metric b{display:block;font-size:18px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}.card{border:1px solid var(--line);border-radius:10px;padding:12px;background:#fff}.card h3{margin:0 0 8px;font-size:16px}.card canvas{display:block;width:100%;height:auto;background:#eef2f5;border-radius:6px;image-rendering:auto}
+.controls{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:10px 0 14px}.controls label{font-weight:700}.controls input[type=range]{width:min(330px,70vw)}
+table{width:100%;border-collapse:collapse;margin-top:12px;font-size:14px}th,td{border:1px solid var(--line);padding:8px;text-align:left}th{background:#edf5fb;color:#123f65}.scroll{overflow-x:auto}
+.status{font-weight:700;color:var(--ok)}.warning{color:var(--warn)}.questions{background:#fff8e6;border-left:5px solid #f0ad2c;padding:12px 16px;border-radius:6px}.questions ol{margin:5px 0;padding-left:24px}details.answers{margin-top:12px;border:1px solid #9fc4df;border-radius:8px;background:#f3f9fd;padding:10px 14px}details.answers summary{cursor:pointer;font-weight:700;color:#0d477c}details.answers li{margin:9px 0}
+.footer-note{color:var(--muted);font-size:13px}.hidden{display:none}.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+@media(max-width:620px){.panel{padding:16px}.grid{grid-template-columns:1fr}header{padding-left:18px;padding-right:18px}}
+</style>
+</head>
+<body>
+<header><h1>第三週｜工業影像基礎互動實作</h1><p>RGB 通道、JPEG 品質、灰階直方圖與幾何變換</p></header>
+<main>
+  <section class="panel">
+    <h2>0. 載入工件影像</h2>
+    <p class="lead">影像只在目前瀏覽器處理，不會上傳。建議使用 PNG 或 JPEG，長邊不超過 3000 px。</p>
+    <div class="upload"><input id="file" type="file" accept="image/png,image/jpeg,image/webp,image/bmp"><span id="status" class="status">請選擇影像</span></div>
+    <div id="meta" class="meta hidden"></div>
+  </section>
+
+  <div id="work" class="hidden">
+  <section class="panel">
+    <h2>實作一｜RGB 通道與 JPEG 品質</h2>
+    <p class="lead">通道以灰階顯示，越亮代表該通道數值越大。JPEG 每次都由原圖重新編碼。</p>
+    <div class="grid">
+      <div class="card"><h3>原圖</h3><canvas id="original"></canvas></div>
+      <div class="card"><h3>R 通道</h3><canvas id="red"></canvas></div>
+      <div class="card"><h3>G 通道</h3><canvas id="green"></canvas></div>
+      <div class="card"><h3>B 通道</h3><canvas id="blue"></canvas></div>
+    </div>
+    <h3>JPEG 品質滑桿</h3>
+    <div class="controls"><label for="quality">品質：<span id="qValue">60</span></label><input id="quality" type="range" min="10" max="100" step="5" value="60"><button id="saveJpeg">下載目前 JPEG</button></div>
+    <div class="grid"><div class="card"><h3>JPEG 解碼結果</h3><canvas id="jpeg"></canvas></div><div class="card"><h3>絕對差值 × 4</h3><canvas id="difference"></canvas></div></div>
+    <div class="scroll"><table><thead><tr><th>品質</th><th>檔案大小</th><th>全圖 MAE</th><th>最大差值</th></tr></thead><tbody id="jpegRows"></tbody></table></div>
+    <div class="questions"><b>觀察問題</b><ol><li>哪個通道最能看清楚工件特徵？</li><li>品質降低時，刻字、細線或彩色邊界有何變化？</li><li>AOI 檢測影像適合使用 PNG 還是 JPEG？</li></ol></div>
+  </section>
+
+  <section class="panel">
+    <h2>實作二｜灰階直方圖</h2>
+    <div class="grid"><div class="card"><h3>灰階影像</h3><canvas id="gray"></canvas></div><div class="card"><h3>灰階分布</h3><canvas id="hist" width="600" height="360"></canvas></div></div>
+    <div id="histMeta" class="meta"></div>
+    <div class="toolbar"><button id="histPng">下載直方圖 PNG</button><button id="histCsv" class="secondary">下載直方圖 CSV</button></div>
+    <div class="questions"><b>觀察問題</b><ol><li>直方圖主要集中在哪個灰階範圍？</li><li>h[255] 太大代表什麼？</li><li>直方圖能指出刮痕的位置嗎？</li></ol></div>
+  </section>
+
+  <section class="panel">
+    <h2>實作三｜幾何變換</h2>
+    <p class="lead">中央 ROI、縮小一半、左右翻轉、逆時針 90°、30° 原畫布與擴大畫布。</p>
+    <div id="geoGrid" class="grid"></div>
+    <div class="scroll"><table><thead><tr><th>操作</th><th>輸出尺寸 W×H</th><th>像素處理</th></tr></thead><tbody id="geoRows"></tbody></table></div>
+    <div class="toolbar"><button id="downloadGeo">逐張下載六張 PNG</button><button id="geoCsv" class="secondary">下載比較表 CSV</button></div>
+    <div class="questions"><b>學習單問題</b><ol><li>哪些操作只是搬動像素？哪些會重新計算像素值？</li><li>30° 旋轉的兩種畫布尺寸差多少？多出的角落是什麼顏色？</li><li>為什麼量測工件尺寸前不應先縮小影像？</li><li>旋轉能否校正軌道透視？</li></ol></div>
+    <details class="answers"><summary>完成作答後，展開參考答案</summary><ol>
+      <li><b>搬動或選取既有像素：</b>中央 ROI 是選取原圖的一部分；左右翻轉與 90° 旋轉只是重新排列像素，像素值不需內插。<b>重新計算像素值：</b>縮小一半與 30° 旋轉使用雙線性內插，輸出像素由鄰近像素加權計算；30° 旋轉還會加入白色補邊。</li>
+      <li><code>expand=False</code> 維持原圖 <span id="sizeNo">W × H</span>；<code>expand=True</code> 為 <span id="sizeYes">擴大後尺寸</span>，本圖增加 <b id="sizeDiff">載入影像後計算</b>。新增而沒有原圖資料的角落為白色，因本程式使用白色補邊。</li>
+      <li>縮小屬於重新取樣，會捨棄細節，並以內插改變邊緣像素值與可能的邊緣位置。原有的像素與實際尺寸換算關係也會改變，已消失的細節無法靠放大復原。因此尺寸量測應使用原始影像，或縮放後重新進行尺度校正。</li>
+      <li><b>不能。</b>旋轉會保持兩條線之間的夾角，原本因透視而收斂的軌道，旋轉後仍然收斂。應選取對應點並進行透視校正；若要量測尺寸，校正後仍須建立尺度。</li>
+    </ol></details>
+  </section>
+  </div>
+  <p class="footer-note">使用 Canvas 在瀏覽器內運算。瀏覽器 JPEG 編碼方式可能與 Pillow 略有差異，請以 Python 版作為正式繳交結果。</p>
+</main>
+<script>
+'use strict';
+const $=id=>document.getElementById(id); let source=null, sourceData=null, grayHist=null, jpegBlob=null, geo=[];
+function fitSize(w,h,max=900){const s=Math.min(1,max/Math.max(w,h));return [Math.max(1,Math.round(w*s)),Math.max(1,Math.round(h*s))]}
+function setCanvas(c,w,h){c.width=w;c.height=h;return c.getContext('2d',{willReadFrequently:true})}
+function bytes(n){return n<1024?n+' B':n<1048576?(n/1024).toFixed(1)+' KB':(n/1048576).toFixed(2)+' MB'}
+function download(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1500)}
+function canvasBlob(canvas,type='image/png',q){return new Promise(r=>canvas.toBlob(r,type,q))}
+function csvBlob(rows){return new Blob(['\ufeff'+rows.map(r=>r.map(v=>'"'+String(v).replaceAll('"','""')+'"').join(',')).join('\n')],{type:'text/csv;charset=utf-8'})}
+function pixelCanvas(id,transform){const c=$(id),ctx=setCanvas(c,source.width,source.height),out=new ImageData(source.width,source.height);for(let i=0;i<sourceData.data.length;i+=4){const p=transform(sourceData.data[i],sourceData.data[i+1],sourceData.data[i+2]);out.data[i]=p[0];out.data[i+1]=p[1];out.data[i+2]=p[2];out.data[i+3]=255}ctx.putImageData(out,0,0)}
+function luminance(r,g,b){return Math.round(.299*r+.587*g+.114*b)}
+async function loadFile(file){$('status').textContent='處理中…';const url=URL.createObjectURL(file),img=new Image();img.onload=async()=>{const [w,h]=fitSize(img.naturalWidth,img.naturalHeight);source=document.createElement('canvas');let ctx=setCanvas(source,w,h);ctx.drawImage(img,0,0,w,h);sourceData=ctx.getImageData(0,0,w,h);URL.revokeObjectURL(url);$('work').classList.remove('hidden');$('meta').classList.remove('hidden');$('meta').innerHTML=`<div class="metric">檔名<b>${file.name}</b></div><div class="metric">原始尺寸<b>${img.naturalWidth} × ${img.naturalHeight}</b></div><div class="metric">操作尺寸<b>${w} × ${h}</b></div><div class="metric">檔案大小<b>${bytes(file.size)}</b></div>`;$('status').textContent='影像已載入';renderBase();renderHistogram();renderGeometry();await renderJpeg();};img.onerror=()=>{$('status').textContent='無法讀取此影像';$('status').classList.add('warning')};img.src=url}
+function renderBase(){for(const id of ['original']){let c=$(id),ctx=setCanvas(c,source.width,source.height);ctx.drawImage(source,0,0)}pixelCanvas('red',(r,g,b)=>[r,r,r]);pixelCanvas('green',(r,g,b)=>[g,g,g]);pixelCanvas('blue',(r,g,b)=>[b,b,b]);pixelCanvas('gray',(r,g,b)=>{let y=luminance(r,g,b);return[y,y,y]})}
+async function renderJpeg(){const q=+$('quality').value;$('qValue').textContent=q;const blob=await canvasBlob(source,'image/jpeg',q/100);jpegBlob=blob;const bmp=await createImageBitmap(blob),c=$('jpeg'),ctx=setCanvas(c,source.width,source.height);ctx.drawImage(bmp,0,0);const decoded=ctx.getImageData(0,0,c.width,c.height),diffC=$('difference'),dctx=setCanvas(diffC,c.width,c.height),out=new ImageData(c.width,c.height);let total=0,max=0,n=c.width*c.height*3;for(let i=0;i<decoded.data.length;i+=4){for(let k=0;k<3;k++){const d=Math.abs(decoded.data[i+k]-sourceData.data[i+k]);total+=d;max=Math.max(max,d);out.data[i+k]=Math.min(255,d*4)}out.data[i+3]=255}dctx.putImageData(out,0,0);$('jpegRows').innerHTML=`<tr><td>${q}</td><td>${bytes(blob.size)}</td><td>${(total/n).toFixed(3)}</td><td>${max}</td></tr>`;bmp.close()}
+function renderHistogram(){grayHist=new Array(256).fill(0);for(let i=0;i<sourceData.data.length;i+=4)grayHist[luminance(sourceData.data[i],sourceData.data[i+1],sourceData.data[i+2])]++;const c=$('hist'),ctx=c.getContext('2d');ctx.clearRect(0,0,c.width,c.height);ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);const L=52,R=16,T=18,B=42,max=Math.max(...grayHist);ctx.strokeStyle='#8796a5';ctx.beginPath();ctx.moveTo(L,T);ctx.lineTo(L,c.height-B);ctx.lineTo(c.width-R,c.height-B);ctx.stroke();ctx.fillStyle='#2367a8';const pw=(c.width-L-R)/256;grayHist.forEach((v,i)=>{const bh=v/max*(c.height-T-B);ctx.fillRect(L+i*pw,c.height-B-bh,Math.max(1,pw),bh)});ctx.fillStyle='#34495e';ctx.font='14px sans-serif';ctx.fillText('0',L-4,c.height-17);ctx.fillText('255',c.width-R-24,c.height-17);ctx.fillText('灰階值',c.width/2-22,c.height-8);const peak=grayHist.indexOf(max),total=source.width*source.height;$('histMeta').innerHTML=`<div class="metric">像素總數<b>${total.toLocaleString()}</b></div><div class="metric">W × H 核對<b>${grayHist.reduce((a,b)=>a+b,0)===total?'正確':'不一致'}</b></div><div class="metric">最高峰灰階<b>${peak}（${max.toLocaleString()} 次）</b></div><div class="metric">h[255] 過曝<b>${grayHist[255].toLocaleString()}（${(grayHist[255]/total*100).toFixed(2)}%）</b></div>`}
+function makeGeoCard(title,w,h,draw,method,name){const wrap=document.createElement('div');wrap.className='card';wrap.innerHTML=`<h3>${title}</h3>`;const c=document.createElement('canvas');const ctx=setCanvas(c,w,h);ctx.fillStyle='white';ctx.fillRect(0,0,w,h);draw(ctx,c);wrap.appendChild(c);$('geoGrid').appendChild(wrap);geo.push({title,w,h,method,name,canvas:c});$('geoRows').insertAdjacentHTML('beforeend',`<tr><td>${title}</td><td>${w} × ${h}</td><td>${method}</td></tr>`)}
+function renderGeometry(){$('geoGrid').innerHTML='';$('geoRows').innerHTML='';geo=[];const w=source.width,h=source.height;makeGeoCard('1 中央 ROI',Math.floor(w/2),Math.floor(h/2),(x)=>x.drawImage(source,w/4,h/4,w/2,h/2,0,0,w/2,h/2),'裁切','01_roi.png');makeGeoCard('2 縮小一半',Math.floor(w/2),Math.floor(h/2),(x,c)=>x.drawImage(source,0,0,c.width,c.height),'雙線性內插','02_half.png');makeGeoCard('3 左右翻轉',w,h,(x)=>{x.translate(w,0);x.scale(-1,1);x.drawImage(source,0,0)},'搬動像素','03_mirror.png');makeGeoCard('4 逆時針 90°',h,w,(x)=>{x.translate(0,w);x.rotate(-Math.PI/2);x.drawImage(source,0,0)},'搬動像素','04_rot90.png');const rad=Math.PI/6;makeGeoCard('5 旋轉 30°，原畫布',w,h,(x)=>{x.translate(w/2,h/2);x.rotate(-rad);x.drawImage(source,-w/2,-h/2)},'內插＋裁切','05_rot30_expand_false.png');const ew=Math.ceil(Math.abs(w*Math.cos(rad))+Math.abs(h*Math.sin(rad))),eh=Math.ceil(Math.abs(w*Math.sin(rad))+Math.abs(h*Math.cos(rad)));makeGeoCard('6 旋轉 30°，擴大畫布',ew,eh,(x)=>{x.translate(ew/2,eh/2);x.rotate(-rad);x.drawImage(source,-w/2,-h/2)},'內插＋白色補邊','06_rot30_expand_true.png');$('sizeNo').textContent=`${w} × ${h}`;$('sizeYes').textContent=`${ew} × ${eh}`;$('sizeDiff').textContent=`寬 ${ew-w} px、高 ${eh-h} px`}
+$('file').addEventListener('change',e=>e.target.files[0]&&loadFile(e.target.files[0]));let timer;$('quality').addEventListener('input',()=>{clearTimeout(timer);timer=setTimeout(renderJpeg,120)});$('saveJpeg').onclick=()=>jpegBlob&&download(jpegBlob,`jpeg_q${$('quality').value}.jpg`);$('histPng').onclick=async()=>download(await canvasBlob($('hist')),'histogram.png');$('histCsv').onclick=()=>download(csvBlob([['gray','count','probability'],...grayHist.map((v,i)=>[i,v,v/(source.width*source.height)])]),'histogram.csv');$('geoCsv').onclick=()=>download(csvBlob([['操作','尺寸 W×H','像素處理'],...geo.map(g=>[g.title,`${g.w}×${g.h}`,g.method])]),'geometry_comparison.csv');$('downloadGeo').onclick=async()=>{for(const g of geo){download(await canvasBlob(g.canvas),g.name);await new Promise(r=>setTimeout(r,180))}};
+</script>
+</body>
+</html>
